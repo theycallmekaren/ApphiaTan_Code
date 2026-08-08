@@ -56,3 +56,18 @@ module.exports.retrieveCartItem = function (req, res) {
         });
 }
 
+module.exports.delete = function (req, res) {
+    const cartItemId = req.body.cart_item_id;
+    return cartModel
+        .deleteCartItem(cartItemId)
+        .then(function () {
+            return res.status(200).json({ success: true, message: "Product removed successfully." });
+        })
+        .catch(function (error) {
+            console.error(error);
+            if (error instanceof EMPTY_RESULT_ERROR) {
+                return res.status(404).json({ error: "Product removed unsuccessfully." });
+            }
+            return res.status(500).json({ error: error.message });
+        });
+}
