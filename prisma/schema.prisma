@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model diningFeedback {
+  feedbackId        Int                @id @default(autoincrement()) @map("feedback_id")
+  orderItemId       Int                @map("order_item_id")
+  memberId          Int                @map("member_id")
+  rating            Int?
+  comment           String?            @db.VarChar(255)
+  lastUpdated       DateTime?          @default(now()) @map("last_updated") @db.Timestamp(6)
+  member            member             @relation(fields: [memberId], references: [memberId], onDelete: NoAction, onUpdate: NoAction)
+  saleOrderItem     saleOrderItem      @relation(fields: [orderItemId], references: [orderItemId], onDelete: NoAction, onUpdate: NoAction)
+  feedbackResponses feedbackResponse[]
+
+  @@map("dining_feedback")
+}
+
+model feedbackResponse {
+  responseId     Int            @id @default(autoincrement()) @map("response_id")
+  lastUpdated    DateTime?      @default(now()) @map("last_updated") @db.Timestamp(6)
+  feedbackId     Int            @map("feedback_id")
+  memberId       Int            @map("member_id")
+  responseText   String?        @map("response_text") @db.VarChar(255)
+  diningFeedback diningFeedback @relation(fields: [feedbackId], references: [feedbackId], onDelete: NoAction, onUpdate: NoAction)
+  member         member         @relation(fields: [memberId], references: [memberId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("feedback_response")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model memberRole {
+  memberId Int    @map("member_id")
+  role     String @db.VarChar(20)
+  member   member @relation(fields: [memberId], references: [memberId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([memberId, role])
+  @@map("member_role")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model saleOrder {
+  orderId         Int             @id @default(autoincrement()) @map("order_id")
+  memberId        Int?            @map("member_id")
+  orderDate       DateTime?       @default(now()) @map("order_date") @db.Timestamp(6)
+  totalAmount     Decimal         @map("total_amount") @db.Decimal(10, 2)
+  status          String          @db.VarChar(20)
+  deliveryAddress String?         @map("delivery_address")
+  member          member?         @relation(fields: [memberId], references: [memberId], onDelete: NoAction, onUpdate: NoAction)
+  saleOrderItems  saleOrderItem[]
+
+  @@map("sale_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model saleOrderItem {
+  orderItemId     Int              @id @default(autoincrement()) @map("order_item_id")
+  orderId         Int?             @map("order_id")
+  productId       Int?             @map("product_id")
+  quantity        Int
+  unitPrice       Decimal          @map("unit_price") @db.Decimal(10, 2)
+  subtotal        Decimal          @db.Decimal(10, 2)
+  diningFeedbacks diningFeedback[]
+  saleOrder       saleOrder?       @relation(fields: [orderId], references: [orderId], onDelete: NoAction, onUpdate: NoAction)
+  product         product?         @relation(fields: [productId], references: [productId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("sale_order_item")
+}
+
+model member {
+  memberId          Int                @id @default(autoincrement()) @map("member_id")
+  username          String             @unique @db.VarChar(50)
+  email             String             @unique @db.VarChar(100)
+  passwordHash      String             @map("password_hash") @db.VarChar(255)
+  firstName         String             @map("first_name") @db.VarChar(50)
+  lastName          String             @map("last_name") @db.VarChar(50)
+  createdAt         DateTime?          @default(now()) @map("created_at") @db.Timestamp(6)
+  diningFeedbacks   diningFeedback[]
+  feedbackResponses feedbackResponse[]
+  memberRoles       memberRole[]
+  saleOrders        saleOrder[]
+  cart              cart[]
+
+  @@map("member")
+}
+
+model product {
+  productId      Int             @id @default(autoincrement()) @map("product_id")
+  name           String          @db.VarChar(100)
+  description    String?
+  price          Decimal         @db.Decimal(10, 2)
+  category       String?         @db.VarChar(50)
+  isAvailable    Boolean?        @default(true) @map("is_available")
+  createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
+  saleOrderItems saleOrderItem[]
+  cartItem cartItem[]
+
+  @@map("product")
+}
+
+model cart {
+  cartId       Int    @id @default(autoincrement()) @map("cart_id")
+  memberId     Int
+  member   member @relation(fields: [memberId], references: [memberId])
+
+  cartItem cartItem[]
+}
+
+model cartItem{
+  cartItemId Int @id@default(autoincrement()) @map("cart_item_id")
+  cartId Int
+  productId Int
+  productName String  @db.VarChar(100)
+  quantity Int
+
+  cart cart @relation(fields: [cartId], references: [cartId])
+  product product @relation(fields: [productId], references: [productId])
+  @@map("cart_item")
+}
