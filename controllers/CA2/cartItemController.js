@@ -14,11 +14,31 @@ module.exports.create = function (req, res) {
             });
         })
         .catch(function (error) {
-            return res.status(error.status || 500).json({
+            return res.status(500).json({
                 success: false,
                 message: error.message
             });
         });
 };
 
-module.exports.update = functio
+module.exports.update = function (req, res){
+    const cartItemId = req.body.cart_item_id;
+    const quantity = req.body.quantity;
+
+    return cartModel.updateCartItem(cartItemId, quantity)
+    .then(function (updatedCartItem) {
+        return res.status(200).json({
+            success: true,
+            message: 'Updated successfully.',
+            data: updatedCartItem
+        });
+    })
+    .catch(function (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    });
+}
+
+
