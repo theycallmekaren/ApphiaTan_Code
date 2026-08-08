@@ -41,4 +41,18 @@ module.exports.update = function (req, res){
     });
 }
 
+module.exports.retrieveCartItem = function (req, res) {
+    return cartModel
+        .getCartItem()
+        .then(function (getCartItem) {
+            return res.status(201).json({
+                success: true,
+                message: 'Cart retrieved successfully.',
+                data: getCartItem
+            })
+        })
+        .catch(function (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        });
+}
 
