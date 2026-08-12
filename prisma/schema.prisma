@@ -125,3 +125,26 @@ model cartItem {
 
   @@map("cart_item")
 }
+
+model productDiscount  {
+  productDiscountId Int @id @default(autoincrement()) @map("product_discount_id")
+  name String @db.VarChar(100)
+  discountType String @db.VarChar(100) @map("discount_type")
+  minQuantity Int? @map("min_quantity")
+  minCartValue Decimal? @db.Decimal(10, 2) @map("min_cart_value")
+  discountPercentage Decimal @db.Decimal(5, 2) @map("discount_percentage")
+  isAvailable Boolean @default(true) @map("is_available")
+  
+  @@map("product_discount")
+}
+
+model deliveryDiscount {
+  deliveryDiscountId Int @id @default(autoincrement()) @map("delivery_discount_id")
+  name String @db.VarChar(100)
+  minCartValue Decimal @db.Decimal(10, 2) @map("min_cart_value")
+  maxCartValue Decimal? @db.Decimal(10, 2) @map("max_cart_value")
+  deliveryFee Decimal @db.Decimal(10, 2) @map("delivery_fee")
+  isAvailable Boolean @default(true) @map("is_available")
+
+  @@map("delivery_discount")
+}
