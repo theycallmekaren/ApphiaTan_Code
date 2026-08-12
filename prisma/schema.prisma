@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+    provider        = "prisma-client-js"
+    previewFeatures = ["postgresqlExtensions", "relationJoins"]
 }
 
 datasource db {
   provider = "postgresql"
+    url      = env("DATABASE_URL")
 }
 
 model diningFeedback {
@@ -98,27 +99,29 @@ model product {
   isAvailable    Boolean?        @default(true) @map("is_available")
   createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
   saleOrderItems saleOrderItem[]
-  cartItem cartItem[]
+  cartItem       cartItem[]
 
   @@map("product")
 }
 
 model cart {
-  cartId       Int    @id @default(autoincrement()) @map("cart_id")
-  memberId     Int
+  cartId   Int    @id @default(autoincrement()) @map("cart_id")
+  memberId Int
   member   member @relation(fields: [memberId], references: [memberId])
 
   cartItem cartItem[]
 }
 
-model cartItem{
-  cartItemId Int @id@default(autoincrement()) @map("cart_item_id")
-  cartId Int
-  productId Int
+model cartItem {
+  cartItemId  Int     @id @default(autoincrement()) @map("cart_item_id")
+  cartId      Int
+  productId   Int
   productName String  @db.VarChar(100)
-  quantity Int
+  quantity    Int
+  price       Decimal @db.Decimal(10, 2)
 
-  cart cart @relation(fields: [cartId], references: [cartId])
+  cart    cart    @relation(fields: [cartId], references: [cartId])
   product product @relation(fields: [productId], references: [productId])
+
   @@map("cart_item")
 }
