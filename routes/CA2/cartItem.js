@@ -7,6 +7,6 @@ router.post('/createCartItem', ensureAuthenticated, cartItemController.create);
 router.put('/updateCartItem', ensureAuthenticated, cartItemController.update);
 router.get('/retrieveCartItem', ensureAuthenticated, cartItemController.retrieveCartItem);
 router.delete('/deleteCartItem', ensureAuthenticated, cartItemController.delete);
-
+router.get('/cartSummary', ensureAuthenticated, cartItemController.cartSummary);
 
 module.exports = router;
