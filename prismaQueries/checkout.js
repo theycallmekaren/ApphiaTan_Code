@@ -1,115 +1,103 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-const { getOrCreateCart } = require("./cart");
+const { getCartByMember } = require("./cart");
 
-async function productDiscount(memberId, originalPrice /* ?? */) {
-  let quantityTotal = 0;
+function roundMoney(value) {
+  return Number(Number(value).toFixed(2));
+}
 
-  const cart = await getOrCreateCart(memberId);
+async function productDiscount(cartItems) {
+  let total = 0;
+  const appliedDiscounts = [];
 
-  if (!cart.cartItem) {
-    return 0;
+  if (cartItems.length === 0) {
+    return {
+      total: 0,
+      appliedDiscounts: [],
+    };
   }
 
-  cart.cartItem.forEach(function (item) {
-    quantityTotal = quantityTotal + item.quantity;
+  const productIds = cartItems.map(function (item) {
+    return item.productId;
   });
 
-  const discount = await prisma.productDiscount.findFirst({
+  const discountRules = await prisma.productDiscount.findMany({
     where: {
       isAvailable: true,
       discountType: "QUANTITY",
+      productId: {
+        in: productIds,
+      },
     },
+    orderBy: [
+      {
+        minQuantity: "desc",
+      },
+      {
+        discountPercentage: "desc",
+      },
+    ],
   });
 
-  if (!discount || discount.minQuantity === null) {
-    return 0;
-  }
+  cartItems.forEach(function (item) {
+    const discount = discountRules.find(function (rule) {
+      return (
+        rule.productId === item.productId && item.quantity >= rule.minQuantity
+      );
+    });
 
-  if (quantityTotal >= discount.minQuantity) {
-    const discountPercentage = Number(discount.discountPercentage);
+    if (!discount) {
+      return;
+    }
 
-    const discountAmount = Number(originalPrice) * (discountPercentage / 100);
+    const productSubtotal = Number(item.price) * item.quantity;
+    const discountAmount = roundMoney(
+      productSubtotal * (Number(discount.discountPercentage) / 100),
+    );
 
-    return discountAmount;
-  }
+    total = total + discountAmount;
+    appliedDiscounts.push({
+      productId: item.productId,
+      productName: item.productName,
+      discountName: discount.name,
+      quantity: item.quantity,
+      discountPercentage: Number(discount.discountPercentage),
+      discountAmount: discountAmount,
+    });
+  });
 
-  return 0;
+  return {
+    total: roundMoney(total),
+    appliedDiscounts: appliedDiscounts,
+  };
 }
 
-async function amountDiscount(memberId) {
-  let amountTotal = 0;
-
-  const cart = await getOrCreateCart(memberId);
-
-  if (!cart.cartItem) {
-    return 0;
-  }
-
-  cart.cartItem.forEach(function (item) {
-    const itemSubtotal = Number(item.price) * item.quantity;
-
-    amountTotal = amountTotal + itemSubtotal;
-  });
-
+async function amountDiscount(originalPrice) {
   const discount = await prisma.productDiscount.findFirst({
     where: {
       isAvailable: true,
       discountType: "CART_VALUE",
+      minCartValue: {
+        lte: originalPrice,
+      },
     },
+    orderBy: [
+      {
+        minCartValue: "desc",
+      },
+      {
+        discountPercentage: "desc",
+      },
+    ],
   });
 
-  if (!discount || discount.minCartValue === null) {
+  if (!discount) {
     return 0;
   }
 
-  if (amountTotal >= Number(discount.minCartValue)) {
-    const discountPercentage = Number(discount.discountPercentage);
-
-    const discountAmount = amountTotal * (discountPercentage / 100);
-
-    return discountAmount;
-  }
-
-  return 0;
-}
-
-async function totalDiscount(memberId) {
-  let originalPrice = 0;
-
-  const cart = await getOrCreateCart(memberId);
-
-  if (!cart.cartItem) {
-    return {
-      originalPrice: 0, // where they get dis from
-      quantityDiscount: 0,
-      cartValueDiscount: 0,
-      totalProductDiscount: 0,
-      priceAfterProductDiscount: 0,
-    };
-  }
-
-  cart.cartItem.forEach(function (item) {
-    const itemSubtotal = Number(item.price) * item.quantity;
-
-    originalPrice = originalPrice + itemSubtotal;
-  });
-
-  const quantityDiscount = await productDiscount(memberId, originalPrice);
-
-  const cartValueDiscount = await amountDiscount(memberId);
-
-  const totalProductDiscount = quantityDiscount + cartValueDiscount;
-
-  const priceAfterProductDiscount = originalPrice - totalProductDiscount;
-
-  return {
-    originalPrice: originalPrice,
-    quantityDiscount: quantityDiscount,
-    cartValueDiscount: cartValueDiscount,
-    totalProductDiscount: totalProductDiscount,
-    priceAfterProductDiscount: priceAfterProductDiscount,
-  };
+  return roundMoney(
+    originalPrice * (Number(discount.discountPercentage) / 100),
+  );
 }
 
 async function deliveryFee(originalPrice) {
@@ -120,14 +108,12 @@ async function deliveryFee(originalPrice) {
   const deliveryRule = await prisma.deliveryDiscount.findFirst({
     where: {
       isAvailable: true,
-
       minCartValue: {
-        lte: originalPrice, 
+        lte: originalPrice,
       },
-
       OR: [
         {
-          maxCartValue: {    
+          maxCartValue: {
             gte: originalPrice,
           },
         },
@@ -136,37 +122,59 @@ async function deliveryFee(originalPrice) {
         },
       ],
     },
-
     orderBy: {
       minCartValue: "desc",
     },
   });
 
   if (!deliveryRule) {
-    throw new Error("No matching delivery rule found.");
+    const error = new Error("No matching delivery rule found.");
+    error.statusCode = 422;
+    throw error;
   }
 
-  return Number(deliveryRule.deliveryFee);
+  return roundMoney(deliveryRule.deliveryFee);
 }
 
 async function calculateCheckout(memberId) {
-  const discountSummary = await totalDiscount(memberId);
+  const cart = await getCartByMember(memberId);
+  let cartItems;
 
-  const deliveryFeeAmount = await deliveryFee(
-    discountSummary.originalPrice
+  if (cart && cart.cartItem) {
+    cartItems = cart.cartItem;
+  } else {
+    cartItems = [];
+  }
+  cartItems = cartItems.filter(function (item) {
+    return item.product && item.product.isAvailable === true;
+  });
+
+  let originalPrice = 0;
+
+  cartItems.forEach(function (item) {
+    originalPrice = originalPrice + Number(item.price) * item.quantity;
+  });
+
+  originalPrice = roundMoney(originalPrice);
+
+  const quantityDiscount = await productDiscount(cartItems);
+  const cartValueDiscount = await amountDiscount(originalPrice);
+  const totalProductDiscount = roundMoney(
+    quantityDiscount.total + cartValueDiscount,
   );
-
-  const finalPrice =
-    discountSummary.priceAfterProductDiscount +
-    deliveryFeeAmount;
+  const priceAfterProductDiscount = roundMoney(
+    Math.max(originalPrice - totalProductDiscount, 0),
+  );
+  const deliveryFeeAmount = await deliveryFee(originalPrice);
+  const finalPrice = roundMoney(priceAfterProductDiscount + deliveryFeeAmount);
 
   return {
-    originalPrice: discountSummary.originalPrice,
-    quantityDiscount: discountSummary.quantityDiscount,
-    cartValueDiscount: discountSummary.cartValueDiscount,
-    totalProductDiscount: discountSummary.totalProductDiscount,
-    priceAfterProductDiscount:
-      discountSummary.priceAfterProductDiscount,
+    originalPrice: originalPrice,
+    quantityDiscount: quantityDiscount.total,
+    quantityDiscounts: quantityDiscount.appliedDiscounts,
+    cartValueDiscount: cartValueDiscount,
+    totalProductDiscount: totalProductDiscount,
+    priceAfterProductDiscount: priceAfterProductDiscount,
     deliveryFee: deliveryFeeAmount,
     finalPrice: finalPrice,
   };
@@ -175,18 +183,3 @@ async function calculateCheckout(memberId) {
 module.exports = {
   calculateCheckout,
 };
-
-/*  LOGIC FLOW
-
-    Cart items 
-        ↓
-    Original cart price
-        ↓
-    Calculate product discounts using original price
-        ↓
-    Discounted cart price
-        ↓
-    Determine delivery fee using original price
-        ↓
-    Final price = discounted cart price + delivery fee 
-*/

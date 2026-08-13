@@ -5,13 +5,16 @@ module.exports.checkoutSummary = function (req, res){
 
     return cartModel.calculateCheckout(memberId)
     .then(function (result){
-        return res.status(201).json({
+        return res.status(200).json({
             success: true,
             message: "Checkout summary retrieved successfully.",
             data: result
         });
     })
     .catch(function (error){
-        return res.status(500).json({success: false, error: error.message});
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message
+        });
     });
 };
