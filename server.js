@@ -35,7 +35,8 @@ app.use('/feedback', require('./routes/feedback'));
 app.use('/', require('./routes/response'));
 app.use('/orders', require('./routes/order'));  
 app.use('/cart', require('./routes/CA2/cartItem'));
-app.use('/checkout', require('./routes/CA2/checkout.js'))
+app.use('/checkout', require('./routes/CA2/checkout'))
+app.use('/transaction', require('./routes/CA2/transaction'))
 
 
 
