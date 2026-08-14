@@ -1,11 +1,11 @@
 generator client {
-    provider        = "prisma-client-js"
-    previewFeatures = ["postgresqlExtensions", "relationJoins"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "relationJoins"]
 }
 
 datasource db {
   provider = "postgresql"
-    url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model diningFeedback {
@@ -85,28 +85,29 @@ model member {
   feedbackResponses feedbackResponse[]
   memberRoles       memberRole[]
   saleOrders        saleOrder[]
-  cart              cart[]
+  cart              cart?
 
   @@map("member")
 }
 
 model product {
-  productId      Int             @id @default(autoincrement()) @map("product_id")
-  name           String          @db.VarChar(100)
-  description    String?
-  price          Decimal         @db.Decimal(10, 2)
-  category       String?         @db.VarChar(50)
-  isAvailable    Boolean?        @default(true) @map("is_available")
-  createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
-  saleOrderItems saleOrderItem[]
-  cartItem       cartItem[]
+  productId        Int               @id @default(autoincrement()) @map("product_id")
+  name             String            @db.VarChar(100)
+  description      String?
+  price            Decimal           @db.Decimal(10, 2)
+  category         String?           @db.VarChar(50)
+  isAvailable      Boolean?          @default(true) @map("is_available")
+  createdAt        DateTime?         @default(now()) @map("created_at") @db.Timestamp(6)
+  saleOrderItems   saleOrderItem[]
+  cartItem         cartItem[]
+  productDiscounts productDiscount[]
 
   @@map("product")
 }
 
 model cart {
   cartId   Int    @id @default(autoincrement()) @map("cart_id")
-  memberId Int
+  memberId Int    @unique(map: "cart_member_id_key") @map("member_id")
   member   member @relation(fields: [memberId], references: [memberId])
 
   cartItem cartItem[]
@@ -114,37 +115,40 @@ model cart {
 
 model cartItem {
   cartItemId  Int     @id @default(autoincrement()) @map("cart_item_id")
-  cartId      Int
-  productId   Int
-  productName String  @db.VarChar(100)
+  cartId      Int     @map("cart_id")
+  productId   Int     @map("product_id")
+  productName String  @map("product_name") @db.VarChar(100)
   quantity    Int
   price       Decimal @db.Decimal(10, 2)
 
   cart    cart    @relation(fields: [cartId], references: [cartId])
   product product @relation(fields: [productId], references: [productId])
 
+  @@unique([cartId, productId], map: "cart_item_cart_id_product_id_key")
   @@map("cart_item")
 }
 
-model productDiscount  {
-  productDiscountId Int @id @default(autoincrement()) @map("product_discount_id")
-  name String @db.VarChar(100)
-  discountType String @db.VarChar(100) @map("discount_type")
-  minQuantity Int? @map("min_quantity")
-  minCartValue Decimal? @db.Decimal(10, 2) @map("min_cart_value")
-  discountPercentage Decimal @db.Decimal(5, 2) @map("discount_percentage")
-  isAvailable Boolean @default(true) @map("is_available")
-  
+model productDiscount {
+  productDiscountId  Int      @id @default(autoincrement()) @map("product_discount_id")
+  productId          Int?     @map("product_id")
+  name               String   @db.VarChar(100)
+  discountType       String   @map("discount_type") @db.VarChar(100)
+  minQuantity        Int?     @map("min_quantity")
+  minCartValue       Decimal? @map("min_cart_value") @db.Decimal(10, 2)
+  discountPercentage Decimal  @map("discount_percentage") @db.Decimal(5, 2)
+  isAvailable        Boolean  @default(true) @map("is_available")
+  product            product? @relation(fields: [productId], references: [productId], onDelete: Cascade, onUpdate: Cascade)
+
   @@map("product_discount")
 }
 
 model deliveryDiscount {
-  deliveryDiscountId Int @id @default(autoincrement()) @map("delivery_discount_id")
-  name String @db.VarChar(100)
-  minCartValue Decimal @db.Decimal(10, 2) @map("min_cart_value")
-  maxCartValue Decimal? @db.Decimal(10, 2) @map("max_cart_value")
-  deliveryFee Decimal @db.Decimal(10, 2) @map("delivery_fee")
-  isAvailable Boolean @default(true) @map("is_available")
+  deliveryDiscountId Int      @id @default(autoincrement()) @map("delivery_discount_id")
+  name               String   @db.VarChar(100)
+  minCartValue       Decimal  @map("min_cart_value") @db.Decimal(10, 2)
+  maxCartValue       Decimal? @map("max_cart_value") @db.Decimal(10, 2)
+  deliveryFee        Decimal  @map("delivery_fee") @db.Decimal(10, 2)
+  isAvailable        Boolean  @default(true) @map("is_available")
 
   @@map("delivery_discount")
 }
